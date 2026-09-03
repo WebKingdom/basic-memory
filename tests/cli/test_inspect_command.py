@@ -630,6 +630,52 @@ def test_inspect_query_json_is_schema_locked_and_always_includes_misses(mock_run
 
 
 @patch("basic_memory.cli.commands.inspect.run_inspect_query", new_callable=AsyncMock)
+def test_inspect_query_forwards_note_type_and_metadata_filters(mock_run):
+    mock_run.return_value = _query_response()
+
+    result = runner.invoke(
+        cli_app,
+        [
+            "inspect",
+            "query",
+            "auth retrieval",
+            "--mode",
+            "hybrid",
+            "--note-type",
+            "decision",
+            "--note-type",
+            "learning",
+            "--metadata-filters",
+            '{"state":{"$in":["active","parked"]}}',
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    query = mock_run.await_args.args[0]
+    assert query.note_types == ["decision", "learning"]
+    assert query.metadata_filters == {"state": {"$in": ["active", "parked"]}}
+
+
+@patch("basic_memory.cli.commands.inspect.run_inspect_query", new_callable=AsyncMock)
+def test_inspect_query_rejects_non_object_metadata_filters(mock_run):
+    result = runner.invoke(
+        cli_app,
+        [
+            "inspect",
+            "query",
+            "auth retrieval",
+            "--metadata-filters",
+            '["active"]',
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "metadata filters must be a JSON object" in result.output
+    mock_run.assert_not_awaited()
+
+
+@patch("basic_memory.cli.commands.inspect.run_inspect_query", new_callable=AsyncMock)
 def test_inspect_query_plain_show_ids_adds_external_id(mock_run):
     mock_run.return_value = _query_response()
 

@@ -1,5 +1,7 @@
 """Read-only retrieval inspection commands."""
 
+import json
+
 from enum import Enum
 from itertools import groupby
 from typing import Annotated, Optional, assert_never
@@ -556,6 +558,20 @@ def inspect_query(
         min=1,
         help="Results per page",
     ),
+    note_types: Annotated[
+        Optional[list[str]],
+        typer.Option(
+            "--note-type",
+            help="Limit to a note type; repeat for more than one",
+        ),
+    ] = None,
+    metadata_filters_json: Annotated[
+        Optional[str],
+        typer.Option(
+            "--metadata-filters",
+            help="Structured frontmatter filters as a JSON object",
+        ),
+    ] = None,
     json_output: bool = typer.Option(False, "--json", help="Output raw JSON"),
     plain: bool = typer.Option(False, "--plain", help="Output undecorated plain text"),
     project: Annotated[
@@ -586,10 +602,20 @@ def inspect_query(
     try:
         validate_routing_flags(local, cloud)
         _validate_output_flags(json_output, plain)
+        metadata_filters = None
+        if metadata_filters_json is not None:
+            metadata_filters = json.loads(metadata_filters_json)
+            if not isinstance(metadata_filters, dict):
+                raise ValueError("metadata filters must be a JSON object")
         with force_routing(local=local, cloud=cloud):
             response = run_with_cleanup(
                 run_inspect_query(
-                    SearchQuery(text=query_text, retrieval_mode=retrieval_mode),
+                    SearchQuery(
+                        text=query_text,
+                        retrieval_mode=retrieval_mode,
+                        note_types=note_types,
+                        metadata_filters=metadata_filters,
+                    ),
                     limit=page_size,
                     offset=(page - 1) * page_size,
                     project=project,
